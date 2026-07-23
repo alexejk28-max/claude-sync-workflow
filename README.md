@@ -1,13 +1,35 @@
 # sync-workflow — a git safety net for Claude Code
 
 A skill plus two slash commands that make Claude Code sync a project with GitHub
-**only when you ask it to**, and that keep several devices working on the same
+**only when you ask it to**, and that keep several machines working on the same
 repository without stepping on each other.
 
-The problem it solves: coding agents like to be helpful. Left alone, they commit and
-push whenever a piece of work looks finished — usually with everything staged, on the
-wrong branch, and with a message nobody wants in the history. This skill turns that into
-an explicit, two-step, confirmation-gated workflow.
+## Why
+
+Most projects are no longer tied to one computer. Three days in the office, two at home,
+sometimes a laptop in between — the work has to follow you, in full, without a "wait, I
+left that on the other machine" moment on Monday morning.
+
+Git already solves the hard part. What breaks in practice is the routine around it: you
+forget to pull before you start, you leave uncommitted work behind on Friday, and the
+first twenty minutes of every session go into figuring out which clone is ahead of which.
+
+This turns that routine into two commands, identical on every machine:
+
+```
+/sync_pull     when you sit down
+/sync_push     when you get up
+```
+
+The agent shows you what changed, asks once, and does the rest — no branch juggling, no
+half-remembered git incantations, and a clear answer when two machines did touch the
+same files.
+
+The second half of the problem is the agent itself. Coding agents like to be helpful:
+left alone, they commit and push whenever a piece of work looks finished — everything
+staged, on whatever branch happened to be checked out, with a message nobody wants in
+the history. Here, nothing reaches the remote without you seeing the file list first and
+saying yes. Two steps, both gated by your confirmation.
 
 ## What you get
 
