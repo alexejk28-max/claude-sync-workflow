@@ -25,8 +25,14 @@ cp -r skills/sync-workflow ~/.claude/skills/
 cp commands/sync_push.md commands/sync_pull.md ~/.claude/commands/
 ```
 
-On Windows the same paths exist as `%USERPROFILE%\.claude\` — copy with Explorer or
-PowerShell, the content is identical.
+On Windows the same paths exist under `%USERPROFILE%\.claude\`. PowerShell has no
+`mkdir -p`; use:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills","$env:USERPROFILE\.claude\commands"
+Copy-Item -Recurse skills\sync-workflow "$env:USERPROFILE\.claude\skills\"
+Copy-Item commands\sync_push.md,commands\sync_pull.md "$env:USERPROFILE\.claude\commands\"
+```
 
 Restart your Claude Code session afterwards. Skills and commands are read at session
 start, so a running session will not see the new files.
@@ -60,6 +66,25 @@ the install command instead of leaving you with a broken tree.
 
 If you want a different commit message format, change it in the skill **and** in
 `commands/sync_push.md` — both mention it.
+
+### Before your first push: check `.gitignore`
+
+The workflow shows you untracked files by name and scans the staged diff for
+credential-shaped content, but the real protection is `.gitignore`. Make sure it covers
+what exists locally *before* the first push:
+
+```bash
+git status --short          # everything marked ?? is a candidate
+git check-ignore -v .env    # confirms a specific file is ignored
+```
+
+Typical entries: `.env*`, `*.pem`, `*.key`, `id_rsa*`, `credentials.json`, `.npmrc`,
+`.netrc`, `node_modules/`, build output, logs, database dumps.
+
+An ignore rule added later does **not** remove anything already committed. If a secret
+did get pushed, rotate it — that is the step that actually helps. Cleaning the history
+afterwards is a separate decision, and on a shared repository it breaks every other
+clone.
 
 ### Optional: state the ground rule in your project instructions
 
@@ -145,6 +170,16 @@ device pushed first. Run `/sync_pull`, then push again. Do not force.
 resolve them. Be careful with configuration and rule files that other parts of the
 project treat as the source of truth — a silently mismerged config is worse than a
 visible conflict.
+
+**A secret was committed.** Revoke and rotate the credential first — assume it is
+compromised from the moment it was pushed. Then remove the file, add it to
+`.gitignore`, and commit that. Rewriting history to erase it is optional, does not
+un-leak anything, and forces every other clone to re-sync — decide that separately.
+
+**A pull changed `.claude/`, a hook, or an MCP manifest.** Read that diff before
+starting the next session. Hooks and MCP servers run commands at session start without
+prompting, and instruction files can carry text aimed at the agent. This matters on any
+repository you share with someone else.
 
 **The agent committed without asking.** Some other instruction outranked the skill.
 Check whether your `CLAUDE.md` or a global instruction file tells it to commit when work

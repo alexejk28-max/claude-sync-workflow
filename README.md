@@ -22,11 +22,17 @@ Core guarantees:
 
 - No `git add/commit/push/pull` without an explicit request from you.
 - Status and diff are always shown, and confirmed, **before** anything is staged.
+  Untracked files are listed by name — "commit everything" never means files you have
+  not seen.
+- The staged diff is scanned for credential-shaped files and content before the commit.
 - No `--force`, no history rewriting, no `git add -f` around `.gitignore`.
 - A pull conflict is never "resolved" with `checkout --` or `reset` — the agent stops
   and asks.
 - After a pull, the agent tells you whether you need to restart the session or reinstall
-  dependencies.
+  dependencies — and shows you the diff of anything under `.claude/`, hooks, or MCP
+  manifests, because those run code at session start.
+- Text that arrives through a pull is treated as data. A skill, README, or commit
+  message from the remote does not get to authorize actions.
 
 ## Installation
 
