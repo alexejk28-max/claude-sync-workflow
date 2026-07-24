@@ -38,9 +38,29 @@ saying yes. Two steps, both gated by your confirmation.
 | `skills/sync-workflow/SKILL.md` | The rules: procedures, error and conflict handling, security, device sync, checklist |
 | `commands/sync_push.md` | `/sync_push` — show status, ask, commit, push |
 | `commands/sync_pull.md` | `/sync_pull` — fetch, ask, pull, report the consequences |
+| `skills/sync-workflow/backends/cloud-folder.md` | Optional backend: git over a Drive/Dropbox folder |
+| `skills/sync-workflow/backends/file-sync.md` | Optional backend: plain file sync through a storage connector |
 | `GUIDE.md` | Step-by-step install, configuration, usage, and troubleshooting |
 
-Core guarantees:
+## Backends
+
+GitHub is the default. If you don't want a GitHub account, two alternatives use the same
+two commands and the same safety rules:
+
+| Backend | Moves data via | History & merge | Use it when |
+|---------|----------------|-----------------|-------------|
+| **GitHub** (default) | a GitHub remote | yes | The normal case. |
+| **cloud-folder** | git to a *bare* repo inside a Drive/Dropbox/OneDrive folder | yes | You want real version control but no GitHub account. The recommended non-GitHub route. |
+| **file-sync** | plain file upload/download through a storage connector or synced folder | **no** | Last resort — non-code files, or when only one machine is ever active at a time. |
+
+The catch worth knowing up front: **file-sync has no merge and no history**. Two machines
+editing the same file produce a "conflicted copy", not a merge — so it ships with an
+explicit no-blind-overwrite procedure and a local state file to detect divergence.
+`cloud-folder` keeps full git (Drive is only the transport), which is why it's the
+preferred alternative. You pick the backend in one config line; the commands dispatch on
+it. See [GUIDE.md](GUIDE.md#choosing-a-backend) to choose and set one up.
+
+Core guarantees (all backends):
 
 - No `git add/commit/push/pull` without an explicit request from you.
 - Status and diff are always shown, and confirmed, **before** anything is staged.
@@ -79,12 +99,18 @@ Open `skills/sync-workflow/SKILL.md` and fill in the table under **Configuration
 
 | Setting | What to put there |
 |---------|-------------------|
-| Repository | `owner/repo` |
+| Sync backend | `github` (default), `cloud-folder`, or `file-sync` |
+| Repository | `owner/repo` for GitHub; the bare-repo path for cloud-folder; n/a for file-sync |
 | Local path | The project root |
 | Branch | Your default branch |
 | Commit format | The commit message shape you want |
 | Restart-relevant paths | Paths whose changes require restarting the agent session — long-running servers, MCP server source, agent config |
 | Dependency manifests | `package.json`, `requirements.txt`, `go.mod`, … |
+| Remote store (file-sync only) | The connector name or synced-folder path |
+
+Leave the backend at `github` and you're done. For `cloud-folder` or `file-sync`, read
+the matching file under `skills/sync-workflow/backends/` once before your first sync —
+each has a short setup and a couple of rules the main skill doesn't repeat.
 
 Everything else in the skill is deliberately generic. The commands need no editing
 unless you want a different commit message format — change it in both places.

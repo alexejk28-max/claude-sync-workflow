@@ -1,7 +1,17 @@
-# Sync Push — push local changes to GitHub
+# Sync Push — push local changes to the remote
 
 The project directory IS the repository — no copy steps. Details and error cases: skill
 `sync-workflow`.
+
+### 0. Determine the backend
+
+Read `Sync backend` from the skill's configuration (default `github`).
+
+- `github` or `cloud-folder`: git under the hood — follow the steps below unchanged
+  (`origin` is a GitHub URL or a local bare-repo path respectively).
+- `file-sync`: **stop and follow `skills/sync-workflow/backends/file-sync.md` instead.**
+  The git steps do not apply; that backend copies files and needs its own conflict and
+  secret checks.
 
 ## Steps
 

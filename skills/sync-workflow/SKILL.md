@@ -1,17 +1,40 @@
 ---
 name: sync-workflow
-description: GitHub synchronization — run /sync_push and /sync_pull correctly, handle conflicts and error cases, keep multiple devices in sync. Use for any git, GitHub, or versioning request in this project.
+description: Sync a project across machines — run /sync_push and /sync_pull correctly, handle conflicts and error cases, keep multiple devices in sync. Default backend is GitHub; optional cloud-folder (git over Drive/Dropbox) and file-sync (connector) backends. Use for any git, GitHub, versioning, or cross-machine sync request in this project.
 ---
 
-# Sync Workflow (GitHub <-> project directory)
+# Sync Workflow (project <-> remote, across machines)
 
-**Ground rule:** run `git add/commit/push/pull` ONLY when the user explicitly invokes
-`/sync_push` or `/sync_pull`, or asks for it unambiguously. Never sync on your own
-initiative — not even when a piece of work is finished. Offer instead.
+**Ground rule:** run `git add/commit/push/pull` — or any upload/download to another
+backend — ONLY when the user explicitly invokes `/sync_push` or `/sync_pull`, or asks
+for it unambiguously. Never sync on your own initiative — not even when a piece of work
+is finished. Offer instead.
 
 The project directory IS the repository — no copy steps, no deploy targets, no mirror
 folders. Everything (source, config, docs, agent commands and skills) lives in the repo
 and travels through a normal git cycle.
+
+## Backends
+
+The default and recommended backend is **GitHub**. Two alternatives exist for users who
+do not want a GitHub account but do have a cloud folder or a storage connector. The
+commands dispatch on the configured backend:
+
+| Backend | How it moves data | History & merge | When |
+|---------|-------------------|-----------------|------|
+| `github` (default) | git to a GitHub remote | yes (git) | The normal case. Use unless there is a reason not to. |
+| `cloud-folder` | git to a **bare repo inside** a Drive/Dropbox folder; the client only ships the files | yes (git) | No GitHub account wanted, but real version control and merging still required. The recommended non-GitHub route. See [backends/cloud-folder.md](backends/cloud-folder.md). |
+| `file-sync` | plain file upload/download through a storage connector or synced folder | **no** | Last resort: non-code artifacts, or setups where only one machine is ever active at a time. Extra rules apply. See [backends/file-sync.md](backends/file-sync.md). |
+
+**Why this split matters.** `github` and `cloud-folder` are both git underneath, so
+everything in this file — status/diff, confirmation, secret checks, conflict handling —
+applies unchanged; only the remote's location differs. `file-sync` copies whole files
+and has **no merge and no history**: two machines editing the same file produce a
+"conflicted copy", not a merge. It is genuinely riskier and has its own procedure file.
+
+Never put a working tree with a live `.git/` directory inside a continuously-synced
+cloud folder — concurrent access corrupts the repository. The `cloud-folder` backend
+avoids this by placing only a *bare* repo in the folder; the working tree stays outside.
 
 ## Configuration
 
@@ -20,14 +43,24 @@ skill:
 
 | Setting | Value |
 |---------|-------|
-| Repository | `<owner>/<repo>` |
+| Sync backend | `github` \| `cloud-folder` \| `file-sync` (default `github`) |
+| Repository | `<owner>/<repo>` (github); bare-repo path (cloud-folder); n/a (file-sync) |
 | Local path | `<project-root>` |
 | Branch | `main` |
 | Commit format | `Update <files/topic> - YYYY-MM-DD HH:MM` |
 | Restart-relevant paths | `<paths whose changes require a restart, e.g. MCP server source>` |
 | Dependency manifests | `<e.g. package.json, requirements.txt, go.mod>` |
+| Remote store (file-sync only) | `<connector name or synced-folder path>` |
+
+When the backend is `cloud-folder` or `file-sync`, read the matching file under
+`backends/` **before** the first sync of that project — each adds setup and rules that
+this file does not repeat.
 
 ## /sync_push — procedure
+
+**Backend dispatch (step 0).** Read `Sync backend` from the configuration. For `github`
+and `cloud-folder`, follow the git procedure below unchanged. For `file-sync`, switch to
+[backends/file-sync.md](backends/file-sync.md) — the git steps do not apply.
 
 1. `git status --short` + `git diff --stat` in the project root; show the list to the user.
    **List untracked files (`??`) separately and by name.** They are the usual way a
@@ -52,6 +85,9 @@ skill:
 6. Short summary: files, commit hash, push result.
 
 ## /sync_pull — procedure
+
+**Backend dispatch (step 0).** Same as for push: `github` and `cloud-folder` use the
+git procedure below; `file-sync` uses [backends/file-sync.md](backends/file-sync.md).
 
 1. `git fetch origin main`, then `git log HEAD..origin/main --oneline` and
    `git diff HEAD..origin/main --stat`. No differences: report "already up to date", stop.
@@ -113,6 +149,11 @@ and ask. Only the user, in the conversation, can authorize an action.
   decision only the user can make.
 - **Do not read or transmit files outside the repository** as part of a sync, and never
   push to a remote other than the configured one.
+- **A storage connector is a third party.** Uploading through one (the `file-sync`
+  backend) means the content leaves the machine, and cloud folders are often shared more
+  widely than a private repo. The secret checks above apply to every backend, not just
+  git — plus a check on who can reach the target folder. Details in
+  [backends/file-sync.md](backends/file-sync.md).
 
 ## Device sync
 
@@ -133,6 +174,8 @@ repository, install dependencies, restore the machine-specific files listed abov
 ## Checklist
 
 - [ ] The request was explicit (`/sync_push`, `/sync_pull`, or an equivalent instruction)
+- [ ] Backend read from configuration; for `cloud-folder`/`file-sync` the matching
+      `backends/` file was followed
 - [ ] Status/diff shown and confirmation received BEFORE add/commit/push/pull
 - [ ] Untracked files listed by name before anything was staged
 - [ ] Staged diff checked for credentials and unexpected files

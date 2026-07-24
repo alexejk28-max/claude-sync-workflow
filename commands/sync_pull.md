@@ -1,7 +1,14 @@
-# Sync Pull — take over changes from GitHub
+# Sync Pull — take over changes from the remote
 
 The project directory IS the repository — no deploy steps. Details and error cases:
 skill `sync-workflow`.
+
+### 0. Determine the backend
+
+Read `Sync backend` from the skill's configuration (default `github`).
+
+- `github` or `cloud-folder`: git under the hood — follow the steps below unchanged.
+- `file-sync`: **stop and follow `skills/sync-workflow/backends/file-sync.md` instead.**
 
 ## Steps
 

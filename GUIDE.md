@@ -48,12 +48,17 @@ A filled-in example:
 
 | Setting | Value |
 |---------|-------|
+| Sync backend | `github` |
 | Repository | `janedoe/research-notes` |
 | Local path | `~/projects/research-notes` |
 | Branch | `main` |
 | Commit format | `Update <files/topic> - YYYY-MM-DD HH:MM` |
 | Restart-relevant paths | `mcp-server/src/`, `.mcp.json` |
 | Dependency manifests | `package.json` |
+
+**Sync backend** stays `github` for the normal case. If you don't have (or want) a
+GitHub account, see [Choosing a backend](#choosing-a-backend) below — the rest of this
+guide applies to every backend.
 
 **Restart-relevant paths** is the one worth thinking about. List anything that a running
 agent session has already loaded into memory and will not reload on its own: MCP server
@@ -95,6 +100,61 @@ repeating it in your `CLAUDE.md` so it applies even when the skill is not loaded
 Git only on explicit request — `/sync_push` or `/sync_pull`. Never commit or push
 automatically, not even when a task is finished. Offer instead.
 ```
+
+## Choosing a backend
+
+Skip this if you're using GitHub — that's the default and needs nothing extra. Read on
+only if you don't want a GitHub account.
+
+Decision in one line: **do you need version history and merging?**
+
+- **Yes, but no GitHub** → `cloud-folder`. You get full git; a Drive/Dropbox/OneDrive
+  folder is only the transport.
+- **No, and only one machine is ever active at a time** → `file-sync`. Simplest, but no
+  history and no merge.
+- **Yes, and GitHub is fine** → stay on `github`.
+
+### cloud-folder — git over a Drive/Dropbox folder
+
+The trick: git pushes to a **bare** repository that lives inside your cloud folder,
+while your actual working copy stays **outside** it. The cloud client only ever ships a
+bare repo, which it can sync safely. (Never let a live `.git/` working tree sit inside a
+synced folder — a client syncing it mid-write corrupts the repo. This is the mistake to
+avoid.)
+
+```bash
+# once, on the first machine:
+git init --bare "~/Drive/repos/my-project.git"      # the "remote", inside the cloud folder
+cd ~/projects/my-project                            # your working copy, OUTSIDE the folder
+git remote add origin "~/Drive/repos/my-project.git"
+git push -u origin main
+
+# on each additional machine, after the client finished downloading the bare repo:
+git clone "~/Drive/repos/my-project.git" ~/projects/my-project
+```
+
+Set **Sync backend** to `cloud-folder` and **Repository** to the bare-repo path. Then
+`/sync_push` and `/sync_pull` work exactly as with GitHub. One habit: let the cloud
+client finish uploading after a push before you start on another machine. Full detail,
+including corruption recovery and a `git bundle` variant, is in
+`skills/sync-workflow/backends/cloud-folder.md`.
+
+### file-sync — plain file copy through a connector
+
+No git at all: files are uploaded and downloaded as-is. That means **no merge and no
+history** — if two machines edit the same file, one copy wins or you get a "conflicted
+copy" to sort out by hand. Only choose this for non-code files, or when just one machine
+is ever active at a time.
+
+To make it safe, the backend keeps a local `.sync-state.json` (timestamps + hashes from
+the last sync, gitignored and never uploaded) so it can tell "I changed this" from "the
+other machine changed this" and refuse to overwrite blindly. Set **Sync backend** to
+`file-sync` and **Remote store** to your connector or synced-folder path, then read
+`skills/sync-workflow/backends/file-sync.md` before the first sync — it carries the full
+conflict, deletion, and secret rules.
+
+If you find yourself untangling conflicted copies more than rarely, that's the sign to
+switch to `cloud-folder` — same cloud storage, but git handles the merging.
 
 ## 3. Use
 
@@ -184,3 +244,16 @@ repository you share with someone else.
 **The agent committed without asking.** Some other instruction outranked the skill.
 Check whether your `CLAUDE.md` or a global instruction file tells it to commit when work
 is done, and remove that.
+
+**(cloud-folder) `fatal: bad object` or push/fetch errors naming objects.** The bare
+repo in the cloud folder is likely corrupted — usually because a working tree ended up
+in the synced folder, or two machines wrote it at once. Pause the cloud client, then
+rebuild the remote from a healthy clone (`git init --bare` a new one, `git push --all`
+into it, repoint the other machines). Full steps in
+`skills/sync-workflow/backends/cloud-folder.md`. Don't delete the old bare repo until
+the new one is verified.
+
+**(file-sync) a "conflicted copy" appeared.** Two machines edited the same file between
+syncs — file-sync can't merge. Open both versions, decide what to keep, and update the
+one you keep. If this happens often, the project has outgrown file-sync: switch to
+`cloud-folder` so git does the merging.
